@@ -1444,6 +1444,18 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot )
 
     if( isBot )
     {
+        // Bots have no human "keep me on the sideline" intent to preserve, so
+        // don't let them get stranded in spectator by G_InitSessionData's
+        // discard-team-data-on-new-session path (e.g. every reconnect after a
+        // map change where level.newSession is set). A bot left in spectator
+        // is invisible to G_CountBotPlayers' per-team headcount, so
+        // G_CheckMinimumPlayers never sees it and keeps spawning more bots on
+        // top of it instead of recognizing the team is already full.
+        if ( level.gametypeData->teams && client->sess.team == TEAM_SPECTATOR )
+        {
+            client->sess.team = PickTeam( -1 );
+        }
+
         ent->r.svFlags |= SVF_BOT;
         ent->inuse = qtrue;
         if( !G_BotConnect( clientNum, !firstTime ) )
