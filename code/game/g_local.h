@@ -1110,6 +1110,8 @@ typedef struct
     qboolean    newSession;             // don't use any old session data, because
                                         // we changed gametype
 
+    qboolean    botAddingDisabled;      // an admin removed bots by hand, bot_minplayers must not top them up again this map
+
     qboolean    restarted;              // waiting for a map_restart to fire
 
     int         numConnectedClients;
@@ -1572,6 +1574,7 @@ char *G_GetBotInfoByNumber( int num );
 char *G_GetBotInfoByName( const char *name );
 void G_CheckBotSpawn( void );
 void G_RemoveQueuedBotBegin( int clientNum );
+int G_KickAllBots( void );
 qboolean G_BotConnect( int clientNum, qboolean restart );
 void Svcmd_AddBot_f( void );
 void Svcmd_BotList_f( void );
@@ -2325,6 +2328,7 @@ int adm_Punish(int argNum, gentity_t* adm, qboolean shortCmd);
 int adm_punishList(int argNum, gentity_t* adm, qboolean shortCmd);
 int adm_mapCycleList(int argNum, gentity_t* adm, qboolean shortCmd);
 int adm_skipToMap(int argNum, gentity_t* adm, qboolean shortCmd);
+int adm_kickAllBots(int argNum, gentity_t* adm, qboolean shortCmd);
 qboolean canClientRunAdminCommand(gentity_t* adm, int adminCommandId);
 int cmdIsAdminCmd(char* cmd, qboolean shortCmd);
 void runAdminCommand(int adminCommandId, int argNum, gentity_t* adm, qboolean shortCmd);

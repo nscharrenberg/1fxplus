@@ -94,6 +94,7 @@ admCmd_t adminCommands[] = {
     {"!fe",    "followenemy",        &a_followEnemy.integer,       &adm_followEnemy,                 "Toggles followenemy", "",        NULL },
     {"!lt",    "listtips",        &minimumAdminLevel,       &adm_listTips,                 "Lists available tips", "",        NULL },
     {"!fs",    "floatspec",       &a_compmode.integer,      &adm_floatSpec,                "Toggle floatspec",     "",        NULL},
+    {"!kab",   "kickallbots",     &a_kick.integer,          &adm_kickAllBots,              "Kick all bots for this map", "",      NULL},
 };
 
 int adminCommandsSize = sizeof(adminCommands) / sizeof(adminCommands[0]);
@@ -2172,13 +2173,50 @@ int adm_Burn(int argNum, gentity_t* adm, qboolean shortCmd) {
     return idNum;
 }
 
+int adm_kickAllBots(int argNum, gentity_t* adm, qboolean shortCmd) {
+
+    int kicked = G_KickAllBots();
+
+    // Whoever runs this wants the bots gone, so don't let bot_minplayers refill them this map.
+    level.botAddingDisabled = qtrue;
+
+    if (kicked) {
+        G_Broadcast(BROADCAST_CMD, NULL, qtrue, "\\Kicked all bots\nby %s", getNameOrArg(adm, "\\RCON", qfalse));
+        G_printCustomMessageToAll("Admin Action", "All bots (%d) were kicked by %s", kicked, getNameOrArg(adm, "RCON", qtrue));
+    }
+    else {
+        G_printInfoMessage(adm, "There are no bots on the server, none will be added for the rest of this map.");
+    }
+
+    logAdmin(adm, NULL, "kickallbots", NULL);
+
+    return -1;
+}
+
 int adm_Kick(int argNum, gentity_t* adm, qboolean shortCmd) {
+
+    // "kick allbots" was an engine command which mapcycles and configs still use. The game takes
+    // over "kick" (see G_InitGame), so it has to be understood here.
+    if (!Q_stricmp(G_GetArg(argNum, shortCmd, qfalse), "allbots")) {
+        if (adm) {
+            return adm_kickAllBots(argNum, adm, shortCmd);
+        }
+
+        // From RCON/mapcycle it is a plain kick, bot_minplayers may still top the bots up afterwards.
+        G_printInfoMessage(NULL, "Kicked %d bots.", G_KickAllBots());
+        return -1;
+    }
 
     int idNum = G_ClientNumFromArg(adm, argNum, "kick", qfalse, qfalse, qfalse, shortCmd);
 
     if (idNum >= 0) {
 
         gentity_t* ent = &g_entities[idNum];
+
+        // Same as !kickallbots: a bot an admin kicked by hand should stay gone.
+        if (ent->r.svFlags & SVF_BOT) {
+            level.botAddingDisabled = qtrue;
+        }
 
         char reason[MAX_SAY_TEXT];
         Q_strncpyz(reason, concatArgs(argNum + 1, shortCmd, qfalse), sizeof(reason));

@@ -283,6 +283,38 @@ static void PlayerIntroSound( const char *modelAndSkin ) {
 
 /*
 ===============
+G_KickAllBots
+
+Drops every bot that is on the server (including those still waiting
+in the spawn queue) and returns how many were dropped.
+===============
+*/
+int G_KickAllBots( void )
+{
+    int         i;
+    int         kicked = 0;
+
+    for ( i = 0 ; i < g_maxclients.integer ; i++ )
+    {
+        if ( level.clients[i].pers.connected == CON_DISCONNECTED )
+        {
+            continue;
+        }
+
+        if ( !g_entities[i].inuse || !(g_entities[i].r.svFlags & SVF_BOT) )
+        {
+            continue;
+        }
+
+        trap_DropClient( i, "was kicked" );
+        kicked++;
+    }
+
+    return kicked;
+}
+
+/*
+===============
 G_AddRandomBot
 ===============
 */
@@ -296,6 +328,12 @@ void G_AddRandomBot( int team )
     char        *value;
     char        *teamstr;
     gclient_t   *cl;
+
+    // an admin took the bots away by hand, don't bring them back this map
+    if ( level.botAddingDisabled )
+    {
+        return;
+    }
 
     num = 0;
 
