@@ -481,7 +481,7 @@ static int G_CountConnectedBots( int team )
             continue;
         }
 
-        if ( !(g_entities[cl->ps.clientNum].r.svFlags & SVF_BOT) )
+        if ( !(g_entities[i].r.svFlags & SVF_BOT) )
         {
             continue;
         }
