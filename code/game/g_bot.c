@@ -460,6 +460,45 @@ int G_CountHumanPlayers( int team )
 
 /*
 ===============
+G_CountConnectedBots
+
+Bots that are in the game, without the ones still in the spawn queue.
+===============
+*/
+static int G_CountConnectedBots( int team )
+{
+    int         i;
+    int         num;
+    gclient_t   *cl;
+
+    num = 0;
+
+    for ( i=0 ; i< g_maxclients.integer ; i++ )
+    {
+        cl = level.clients + i;
+        if ( cl->pers.connected != CON_CONNECTED )
+        {
+            continue;
+        }
+
+        if ( !(g_entities[cl->ps.clientNum].r.svFlags & SVF_BOT) )
+        {
+            continue;
+        }
+
+        if ( team >= 0 && cl->sess.team != team )
+        {
+            continue;
+        }
+
+        num++;
+    }
+
+    return num;
+}
+
+/*
+===============
 G_CountBotPlayers
 ===============
 */
@@ -545,36 +584,41 @@ void G_CheckMinimumPlayers( void )
 
     if ( level.gametypeData->teams )
     {
-        if (minplayers >= g_maxclients.integer / 2)
+        int redTotal;
+        int blueTotal;
+        int smallTeam;
+        int bigTeam;
+
+        // Unlike Q3 this is the number of players on the server in total, not per team,
+        // so bot_minplayers 4 gives 4 bots on an empty server in any gametype.
+        if (minplayers >= g_maxclients.integer)
         {
-            minplayers = (g_maxclients.integer / 2) -1;
+            minplayers = g_maxclients.integer - 1;
         }
 
-        humanplayers = G_CountHumanPlayers( TEAM_RED );
-        botplayers = G_CountBotPlayers( TEAM_RED );
+        humanplayers = G_CountHumanPlayers( TEAM_RED ) + G_CountHumanPlayers( TEAM_BLUE );
 
-        //
+        // Bots are counted wherever they are. One that ended up in spectator still takes a
+        // slot, and not counting it would make every check add another bot on top of it.
+        botplayers = G_CountBotPlayers( -1 );
+
+        // Fill up the team with the fewest players, take bots away from the one with the most.
+        redTotal = G_CountHumanPlayers( TEAM_RED ) + G_CountConnectedBots( TEAM_RED );
+        blueTotal = G_CountHumanPlayers( TEAM_BLUE ) + G_CountConnectedBots( TEAM_BLUE );
+        smallTeam = (blueTotal < redTotal) ? TEAM_BLUE : TEAM_RED;
+        bigTeam = (blueTotal > redTotal) ? TEAM_BLUE : TEAM_RED;
+
         if (humanplayers + botplayers < minplayers)
         {
-            G_AddRandomBot( TEAM_RED );
+            G_AddRandomBot( smallTeam );
         }
         else if (humanplayers + botplayers > minplayers && botplayers)
         {
-            G_RemoveRandomBot( TEAM_RED );
-        }
-
-        //
-        humanplayers = G_CountHumanPlayers( TEAM_BLUE );
-        botplayers = G_CountBotPlayers( TEAM_BLUE );
-
-        //
-        if (humanplayers + botplayers < minplayers)
-        {
-            G_AddRandomBot( TEAM_BLUE );
-        }
-        else if (humanplayers + botplayers > minplayers && botplayers)
-        {
-            G_RemoveRandomBot( TEAM_BLUE );
+            // Spectating bots do nothing for the game, they go first.
+            if ( !G_RemoveRandomBot( TEAM_SPECTATOR ) && !G_RemoveRandomBot( bigTeam ) )
+            {
+                G_RemoveRandomBot( smallTeam );
+            }
         }
     }
     else
